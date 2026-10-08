@@ -1,78 +1,91 @@
-# TikTok Video Virality Prediction
+# TikTok Virality: Data Cleaning & Feasibility Analysis
 
-> Feasibility study and proposed machine-learning framework for predicting which short-form videos go viral on TikTok. Data cleaning, virality labelling and exploratory analysis in R, framed around creator, brand and MCN decisions.
+Can we tell in advance which short-form videos will take off? This project builds the data foundation for answering that: a reproducible cleaning pipeline, a workable definition of "viral", and the exploratory evidence needed to decide whether a prediction model is worth building.
 
-Individual project for *Foundations of Data Science* (FIT5145) at Monash University Malaysia, Mar-May 2026.
+**Stack:** R (tidyverse, ggplot2, corrplot, R Markdown) · Python (HuggingFace `datasets`)
 
-**Scope:** this repository contains the data work (cleaning, label definition, EDA) and the proposed modelling approach. The classification models described below are the *proposed* design; they have not been trained or evaluated.
+> **Scope.** This is a feasibility study. It covers data cleaning, label design and EDA, plus the design of a modelling pipeline. No model is trained or evaluated here.
 
-## Business Problem
+---
 
-Short-form video platforms produce enormous content volumes, yet only a small fraction achieves viral reach. The project defines virality as the **top 10% of engagement rate**, (likes + comments + shares) / views, and asks whether it can be predicted early enough to support three decisions:
+## Problem
 
-| Stakeholder | Decision supported |
+Short-form platforms publish enormous volumes of content, but only a small slice reaches a large audience. Three groups act on that question differently:
+
+| Stakeholder | Decision |
 |---|---|
-| Content creators | Optimise posting strategy and content format for reach |
-| Brands | Allocate influencer-marketing budgets to high-virality-potential creators |
-| MCNs | Identify and recruit promising creators early |
+| Content creators | What format and posting strategy to use |
+| Brands | Which creators to put influencer budget behind |
+| Multi-channel networks | Which creators to recruit early |
+
+Raw view count is a poor target for all three, because it mostly reflects how big an account already is. This project instead defines virality as the **top 10% of engagement rate** — `(likes + comments + shares) / views` — which is independent of audience size.
 
 ## Data
 
-| Source | Size | Role |
+| Source | Scale | Role |
 |---|---|---|
-| [Kaggle TikTok engagement dataset](https://www.kaggle.com/datasets/raminhuseyn/dataset-from-tiktok/data) | 19,382 rows, 12 columns | Prototype dataset for cleaning and EDA |
-| [HuggingFace TikTok-10M](https://huggingface.co/datasets/The-data-company/TikTok-10M) | 10M rows, 55 columns, 9.78 GB Parquet | Full-scale source with audio, geolocation, hashtag and posting-time fields; sampled to 100k rows via streaming |
+| [Kaggle TikTok dataset](https://www.kaggle.com/datasets/raminhuseyn/dataset-from-tiktok/data) | 19,382 rows × 12 cols | Demonstration dataset used throughout the main analysis |
+| [HuggingFace TikTok-10M](https://huggingface.co/datasets/The-data-company/TikTok-10M) | 9.78 GB Parquet, 55 cols | Full-scale source; pipeline designed for it in the appendix |
 
-## Cleaning and Labelling
+Python is used purely as an acquisition utility — streaming the Parquet shards and writing a year-filtered CSV — because R has no efficient native streamer for them. **All cleaning, feature engineering and analysis is done in R.**
 
-- 298 rows (1.54%) were missing every engagement metric at once, which points to records not yet indexed at collection time rather than random gaps, so they were dropped as a block (19,084 rows retained).
-- No zero-view rows, no outliers under a 3x IQR fence, and no duplicate video IDs were found.
-- Engagement rate replaces raw view count as the target, because it does not depend on audience size.
-- The top-10% cut-point is an engagement rate of 0.636, giving roughly a 10:1 class imbalance.
+## Approach
 
-## Key Findings (EDA)
+The cleaning pipeline is organised around DAMA data-quality dimensions, so each step answers a named quality question rather than being an ad-hoc fix:
 
-**1. Claim videos engage more than opinion videos.** Median engagement rate is 0.394 vs 0.259, about 52% higher (Welch t-test, p < 0.001).
+| Step | Dimension | Result |
+|---|---|---|
+| Drop rows missing core engagement metrics | Completeness | 298 rows removed (1.54%) |
+| Remove zero-view records | Validity | 0 removed |
+| 3×IQR fence on view count | Reasonability | 0 outliers |
+| Deduplicate on video ID | Uniqueness | 0 duplicates |
+| Engagement rate, viral label, duration bins | Integrity | 19,084 rows retained |
 
-![Engagement rate by claim status](figures/claim_vs_opinion.png)
+The 298 missing rows are missing across **all seven** engagement columns at once rather than scattered at random, which points to records not yet indexed at collection time — so they are dropped as a block instead of imputed.
 
-**2. Verified accounts get fewer views and lower engagement.** Median views are 6,024 vs 46,723 and median engagement rate is 0.280 vs 0.318. The engagement gap is partly a content-mix effect: 83% of verified videos are opinion-type, which engage less.
+The top-10% cut-point lands at an engagement rate of **0.636**, giving a clean ~10:1 class imbalance.
 
-![Verified vs not-verified accounts](figures/verified_accounts.png)
+## Findings
 
-**3. Duration alone is a weak predictor.** Median engagement rate varies by only 2.9% across duration bins, versus about 52% for claim status. This supports combining content, creator and contextual features.
+**Content type is a real signal.** Claim videos have a median engagement rate of 0.394 versus 0.259 for opinion videos — about 52% higher, with a t-test p < 0.001.
 
-![Median engagement rate by video duration](figures/duration_effect.png)
+![Engagement rate by claim status](figures/engagement_by_claim_status.png)
 
-**4. Engagement counts are strongly collinear** (likes vs views r = 0.80, shares vs views r = 0.67), which favours tree-based models over linear ones.
+**Duration is not.** Median engagement varies only about 3% across the four duration bins. A single-feature heuristic like "keep it under 15 seconds" is not supported by this data, which is the central argument for combining content, creator and contextual features.
 
-## Proposed Modelling Framework (not yet implemented)
+**Author status matters.** Banned (0.396) and under-review (0.351) authors show higher median engagement than active ones (0.305) — a controversial-content effect any model would need to account for.
 
-Logistic Regression as a baseline, then Random Forest, then XGBoost with `scale_pos_weight` for the class imbalance, with SHAP for interpretation. Planned evaluation: precision, recall, F1 and ROC-AUC. TikTok-10M would add the music/audio, posting-time and geolocation features the demo dataset lacks.
+**Engagement counts are heavily collinear** (likes–views r = 0.80, shares–views r = 0.67), so tree-based methods are preferable to linear ones.
 
-## Repository Contents
+![Correlation matrix](figures/correlation_matrix.png)
+
+The engagement-rate distribution is strongly right-skewed, which is why the log transform is used and why the top-10% threshold is a cut on the tail rather than a natural break:
+
+![Distribution of engagement rate](figures/engagement_rate_distribution.png)
+
+## Proposed Model (design only)
+
+Logistic Regression as a baseline → Random Forest → XGBoost with `scale_pos_weight` for the imbalance, interpreted with SHAP. Planned metrics: precision, recall, F1, ROC-AUC. Scaling to TikTok-10M adds the feature classes the demo dataset lacks entirely — music/audio, posting time and geolocation.
+
+## Repository
 
 ```
-analysis/tiktok_virality_feasibility.Rmd   cleaning, labelling and EDA (R Markdown)
-scripts/sample_tiktok10m.py                streams a 100k-row sample from TikTok-10M
-figures/                                   figures used in this README
-data/README.md                             where to download the dataset
+analysis/tiktok_virality_feasibility.Rmd   cleaning, labelling, EDA, and the TikTok-10M pipeline appendix
+scripts/sample_tiktok10m_filtered.py       streams TikTok-10M and writes a year-filtered CSV
+scripts/probe_year_distribution.py         checks the year distribution before sampling
+figures/                                   figures used above
+data/README.md                             download links
 ```
 
-## Reproduce
+## Running It
 
-1. Download `tiktok_dataset.csv` from the Kaggle link above and place it next to the `.Rmd` file.
-2. In R, install `tidyverse`, `scales`, `knitr`, `corrplot` and `rmarkdown`, then knit `analysis/tiktok_virality_feasibility.Rmd`.
+```r
+install.packages(c("tidyverse", "scales", "knitr", "corrplot", "rmarkdown"))
+rmarkdown::render("analysis/tiktok_virality_feasibility.Rmd")
+```
 
-The raw data is not committed because it belongs to its original publishers.
+Download `tiktok_dataset.csv` from the Kaggle link above and place it beside the `.Rmd` first. The raw data is not committed, since it belongs to its original publishers.
 
-## Tech Stack
+## Context
 
-| Tool | Purpose |
-|---|---|
-| R (tidyverse, ggplot2, corrplot, knitr) | Cleaning, feature engineering, EDA, reproducible report |
-| Python (HuggingFace datasets) | Streaming a 100k-row sample from TikTok-10M |
-
-## Author
-
-Xiaowei Xu | Master of Data Science, Monash University Malaysia
+Individual assignment for FIT5145 Foundations of Data Science, Monash University Malaysia, March–May 2026.

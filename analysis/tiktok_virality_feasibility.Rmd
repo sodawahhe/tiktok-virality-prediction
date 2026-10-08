@@ -433,9 +433,3 @@ tt10m %>%
 ```
 
 The appendix is **structurally identical** to the main pipeline (§2–§4) — same DAMA dimensions, same `tidyverse` idioms, same statistical tests. The only difference is the dataset and the additional contextual features (posting time, music originality) made available by TikTok-10M.
-
----
-
-# AI Usage Declaration
-
-I used ChatGPT and Google Gemini as aids while completing this assignment, for purposes including reviewing R syntax, exploring feature-engineering patterns, and improving written clarity. All final data decisions, code, visualisations, and interpretations were checked, modified, and authored by me.

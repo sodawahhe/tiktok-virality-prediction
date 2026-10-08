@@ -18,7 +18,7 @@ Short-form platforms publish enormous volumes of content, but only a small slice
 | Brands | Which creators to put influencer budget behind |
 | Multi-channel networks | Which creators to recruit early |
 
-Raw view count is a poor target for all three, because it mostly reflects how big an account already is. This project instead defines virality as the **top 10% of engagement rate** — `(likes + comments + shares) / views` — which is independent of audience size.
+Raw view count is a poor target for all three, because it mostly reflects how big an account already is. This project instead defines virality as the **top 10% of engagement rate**, `(likes + comments + shares) / views`, which is independent of audience size.
 
 ## Data
 
@@ -27,7 +27,7 @@ Raw view count is a poor target for all three, because it mostly reflects how bi
 | [Kaggle TikTok dataset](https://www.kaggle.com/datasets/raminhuseyn/dataset-from-tiktok/data) | 19,382 rows × 12 cols | Demonstration dataset used throughout the main analysis |
 | [HuggingFace TikTok-10M](https://huggingface.co/datasets/The-data-company/TikTok-10M) | 9.78 GB Parquet, 55 cols | Full-scale source; pipeline designed for it in the appendix |
 
-Python is used purely as an acquisition utility — streaming the Parquet shards and writing a year-filtered CSV — because R has no efficient native streamer for them. **All cleaning, feature engineering and analysis is done in R.**
+Python is used purely as an acquisition utility that streams the Parquet shards and writes a year-filtered CSV, because R has no efficient native streamer for them. **All cleaning, feature engineering and analysis is done in R.**
 
 ## Approach
 
@@ -41,19 +41,19 @@ The cleaning pipeline is organised around DAMA data-quality dimensions, so each 
 | Deduplicate on video ID | Uniqueness | 0 duplicates |
 | Engagement rate, viral label, duration bins | Integrity | 19,084 rows retained |
 
-The 298 missing rows are missing across **all seven** engagement columns at once rather than scattered at random, which points to records not yet indexed at collection time — so they are dropped as a block instead of imputed.
+The 298 missing rows are missing across **all seven** engagement columns at once rather than scattered at random, which points to records not yet indexed at collection time, so they are dropped as a block instead of imputed.
 
 The top-10% cut-point lands at an engagement rate of **0.636**, giving a clean ~10:1 class imbalance.
 
 ## Findings
 
-**Content type is a real signal.** Claim videos have a median engagement rate of 0.394 versus 0.259 for opinion videos — about 52% higher, with a t-test p < 0.001.
+**Content type is a real signal.** Claim videos have a median engagement rate of 0.394 versus 0.259 for opinion videos, about 52% higher, with a t-test p < 0.001.
 
 ![Engagement rate by claim status](figures/engagement_by_claim_status.png)
 
 **Duration is not.** Median engagement varies only about 3% across the four duration bins. A single-feature heuristic like "keep it under 15 seconds" is not supported by this data, which is the central argument for combining content, creator and contextual features.
 
-**Author status matters.** Banned (0.396) and under-review (0.351) authors show higher median engagement than active ones (0.305) — a controversial-content effect any model would need to account for.
+**Author status matters.** Banned (0.396) and under-review (0.351) authors show higher median engagement than active ones (0.305), a controversial-content effect any model would need to account for.
 
 **Engagement counts are heavily collinear** (likes–views r = 0.80, shares–views r = 0.67), so tree-based methods are preferable to linear ones.
 
@@ -65,7 +65,7 @@ The engagement-rate distribution is strongly right-skewed, which is why the log 
 
 ## Proposed Model (design only)
 
-Logistic Regression as a baseline → Random Forest → XGBoost with `scale_pos_weight` for the imbalance, interpreted with SHAP. Planned metrics: precision, recall, F1, ROC-AUC. Scaling to TikTok-10M adds the feature classes the demo dataset lacks entirely — music/audio, posting time and geolocation.
+Logistic Regression as a baseline → Random Forest → XGBoost with `scale_pos_weight` for the imbalance, interpreted with SHAP. Planned metrics: precision, recall, F1, ROC-AUC. Scaling to TikTok-10M adds the feature classes the demo dataset lacks entirely: music/audio, posting time and geolocation.
 
 ## Repository
 
